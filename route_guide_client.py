@@ -1,7 +1,9 @@
 import logging
+import random
 
 import grpc
 
+import resources
 import route_guide_pb2
 import route_guide_pb2_grpc
 
@@ -24,11 +26,45 @@ def guide_get_feature(stub):
     guide_get_one_feature(stub, route_guide_pb2.Point(latitude=0, longitude=0))
 
 
+def guide_list_features(stub):
+    rectangle = route_guide_pb2.Rectangle(
+        lo=route_guide_pb2.Point(latitude=400000000, longitude=-742200683),
+        hi=route_guide_pb2.Point(latitude=420000000, longitude=-730000000))
+    print("Looking for features between 40, -75 and 42, -73")
+
+    features = stub.ListFeatures(rectangle)
+
+    for feature in features:
+        print("Feature called %s at %s" % (feature.name, feature.location))
+
+
+def generate_route(feature_list):
+    for _ in range(0, 10):
+        random_feature = feature_list[random.randint(0, len(feature_list) - 1)]
+        print("Visiting point %s" % random_feature.location)
+        yield random_feature.location
+
+
+def guide_record_route(stub):
+    feature_list = resources.read_route_guide_database()
+
+    route_iterator = generate_route(feature_list)
+    route_summary = stub.RecordRoute(route_iterator)
+    print("Finished trip with %s points " % route_summary.point_count)
+    print("Passed %s features " % route_summary.feature_count)
+    print("Travelled %s meters " % route_summary.distance)
+    print("It took %s seconds " % route_summary.elapsed_time)
+
+
 def run():
     with grpc.insecure_channel('localhost:50051') as channel:
         stub = route_guide_pb2_grpc.RouteGuideStub(channel)
-        print("-------------- GetFeature --------------")
-        guide_get_feature(stub)
+        # print("-------------- GetFeature --------------")
+        # guide_get_feature(stub)
+        # print("-------------- ListFeatures --------------")
+        # guide_list_features(stub)
+        print("-------------- RecordRoute --------------")
+        guide_record_route(stub)
 
 
 if __name__ == '__main__':
